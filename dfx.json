@@ -1,0 +1,7 @@
+{
+  "canisters": {
+    "billboard": { "type": "motoko", "main": "src/billboard/main.mo", "candid": "src/billboard/billboard.did" },
+    "www": { "type": "assets", "source": ["frontend/dist"] }
+  },
+  "networks": { "ic": { "providers": ["https://ic0.app"] } }
+}

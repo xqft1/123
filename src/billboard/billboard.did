@@ -1,0 +1,17 @@
+type Rect = record { x0: nat32; y0: nat32; x1: nat32; y1: nat32 };
+
+service : {
+  get_dimensions : () -> (nat32, nat32) query;
+  get_image_chunk : (nat32, nat32) -> (vec nat32) query;
+  link_at : (record { x: nat32; y: nat32 }) -> (opt text) query;
+
+  claim_region : (Rect) -> ();
+  paint_region : (Rect, vec nat32) -> ();
+  set_region_link : (Rect, text) -> ();
+
+  // Optional granular operations (only if you want them)
+  // claim_pixels : (vec nat32) -> ();
+  // paint_pixels : (vec nat32, vec nat32) -> ();
+  // set_links : (vec nat32, text) -> ();
+}
+

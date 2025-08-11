@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>One Million Pixel Billboard • Built on the Internet Computer</title>
+    <meta name="description" content="Claim and paint pixels on a 1,000×1,000 canvas. Drag to select blocks, upload an image or paint freehand. Pay 0.01 ICP per pixel." />
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/assets/paint-brush-BaapNmCo.png" />
+
+    <style>
+      :root{
+        --bg:#0b0d12; --card:#121826; --text:#e6e9ef; --muted:#8a94a7;
+        --accent:#6aa6ff; --danger:#ff6b6b; --ok:#8ff0a4; --ok-bg:#133d1a; --ok-border:#1e7a31;
+      }
+      *{box-sizing:border-box}
+      html,body{margin:0;height:100%}
+      body{
+        font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,Noto Sans,"Apple Color Emoji","Segoe UI Emoji";
+        background:radial-gradient(1200px 800px at 20% -10%,#141a2b 0%,var(--bg) 55%); color:var(--text);
+      }
+      button,input,select,textarea{font:inherit}
+
+      .ic-accent{height:3px;background:linear-gradient(90deg,#ff6b6b,#ff9f1a,#00d0ff,#a066ff)}
+
+      /* Header kept above everything and clickable */
+      header{
+        position:sticky; top:0; z-index:2147483647;
+        background:rgba(18,24,38,.96); backdrop-filter:blur(8px);
+        border-bottom:1px solid #1f2a3b; pointer-events:auto;
+      }
+      .wrap{max-width:1200px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:12px}
+      .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.2px;min-width:0}
+      .muted{color:var(--muted)}
+
+      .pill{
+        padding:8px 12px;border:1px solid #233046;border-radius:999px;
+        background:#0e1420;color:var(--text);cursor:pointer;position:relative;
+        display:inline-flex;align-items:center;gap:8px;white-space:nowrap;
+        font:600 14px/1 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;
+        pointer-events:auto;
+      }
+      .pill:hover{border-color:#31415c}
+      .pill.primary{background:#193155;border-color:#2b4d85}
+      .pill.ghost{background:transparent}
+      .pill:focus-visible{outline:2px solid #6aa6ff;outline-offset:2px}
+      .signed-in{background:var(--ok-bg)!important;border-color:var(--ok-border)!important;color:var(--ok)!important}
+
+      .userbox{margin-left:auto;display:flex;gap:8px;align-items:center;position:relative;z-index:2147483647}
+
+      /* Dropdown menu (CSS-only toggle supported) */
+      .menu{
+        display:none; position:absolute; right:0; top:calc(100% + 8px);
+        background:#101625;border:1px solid #223049;border-radius:12px;padding:6px;min-width:200px;
+        box-shadow:0 10px 24px rgba(0,0,0,.45); z-index:2147483647;
+      }
+      .menu .menu-item{
+        display:block;width:100%;text-align:left;padding:8px 10px;color:#dbe2f2;
+        border-radius:8px;font-size:14px;background:transparent;border:0;cursor:pointer;
+      }
+      .menu .menu-item:hover{background:#172035}
+
+      /* CSS-only open: hidden checkbox toggles menu */
+      .userbox #userMenuToggle:checked + #btn-login + #userMenu { display:block; }
+
+      main{max-width:1200px;margin:24px auto;padding:0 16px 48px;display:grid;grid-template-columns:1fr;gap:16px}
+      .card{background:var(--card);border:1px solid #1f2a3b;border-radius:16px;padding:16px;box-shadow:0 10px 24px rgba(0,0,0,.35)}
+      .toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+      .toolbar::-webkit-scrollbar{height:8px}
+
+      .canvas-scroll{overflow:auto;-webkit-overflow-scrolling:touch;border-radius:12px}
+      #root{position:relative;width:fit-content;margin:0 auto}
+      canvas{image-rendering:pixelated;border-radius:12px;background:#fff}
+
+      footer{text-align:center;color:var(--muted);padding:24px 0 48px}
+      .hint{font-size:.92rem;color:var(--muted)}
+      .list{margin:8px 0 0 0;padding-left:18px;color:var(--muted)}
+      .spacer{height:8px}
+      .statusbar{display:flex;align-items:center;gap:16px;margin:10px 0 6px 0;flex-wrap:wrap}
+      #balance{font-variant-numeric:tabular-nums}
+      #affordMsg{color:var(--danger);display:none;font-weight:600}
+      .addr{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:#0e1420;border:1px solid #233046;padding:4px 8px;border-radius:8px}
+      .copy{cursor:pointer;margin-left:6px;user-select:none;color:#9fb4ff}
+
+      .ic-logo{width:22px;height:16px;display:block}
+      .ic-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:999px;background:rgba(20,26,43,.6);border:1px solid #24314a;color:var(--muted);font-size:12px}
+      .ic-badge .label{background:linear-gradient(90deg,#ff6b6b,#ff9f1a,#00d0ff,#a066ff);-webkit-background-clip:text;background-clip:text;color:transparent;font-weight:700}
+
+      .previewbar{display:none;align-items:center;gap:10px;margin:10px 0 6px 0;padding:8px 10px;border-radius:12px;background:#0f1726;border:1px solid #21304a}
+      .previewbar.show{display:flex}
+      .preview-meta{color:#cbd5e1;font-size:14px}
+
+      @media (max-width:900px){
+        .wrap{padding:10px 12px}
+        .brand span{font-size:15px}
+        .statusbar{gap:10px}
+      }
+      @media (max-width:640px){
+        .wrap{gap:8px}
+        .brand{gap:8px}
+        .brand span{font-size:14px}
+        .pill{padding:8px 10px}
+        .toolbar{gap:8px}
+        .statusbar{flex-direction:column;align-items:flex-start}
+        .ic-badge{display:none}
+        .card{padding:12px}
+        .canvas-scroll{margin:0 -4px;padding:0 4px}
+      }
+      /* Style details/summary like the old dropdown */
+#userMenuBox{ position: relative; }
+#userMenuBox[open] #userMenu{ display:block; position:absolute; right:0; top:calc(100% + 8px); }
+#userMenuBox summary { list-style:none; }
+#userMenuBox summary::-webkit-details-marker{ display:none; }
+
+    </style>
+    <script type="module" crossorigin src="/assets/index-D243WTYG.js"></script>
+  </head>
+  <body>
+    <div class="ic-accent"></div>
+    <header>
+      <div class="wrap">
+        <div class="brand">
+          <!-- tiny IC logo -->
+          <svg class="ic-logo" viewBox="0 0 200 150" aria-label="Internet Computer logo" role="img">
+            <defs>
+              <linearGradient id="g1" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stop-color="#ff6b6b"/><stop offset="50%" stop-color="#ff9f1a"/><stop offset="100%" stop-color="#ffd166"/></linearGradient>
+              <linearGradient id="g2" x1="0%" y1="50%" x2="100%" y2="50%"><stop offset="0%" stop-color="#00d0ff"/><stop offset="60%" stop-color="#7a7fff"/><stop offset="100%" stop-color="#a066ff"/></linearGradient>
+            </defs>
+            <path d="M100,75 C60,10 5,20 15,62 C22,91 54,103 100,75" fill="none" stroke="url(#g1)" stroke-width="26" stroke-linecap="round"/>
+            <path d="M100,75 C140,140 195,130 185,88 C178,59 146,47 100,75" fill="none" stroke="url(#g2)" stroke-width="26" stroke-linecap="round"/>
+            <path d="M85 74 Q100 69 115 74" fill="none" stroke="#0b0d12" stroke-width="10" stroke-linecap="round"/>
+          </svg>
+          <span class="ic-badge"><span class="label">One&nbsp;Million&nbsp;Pixel&nbsp;Billboard</span></span>
+        </div>
+        <div class="muted" id="price">Price: 0.01 ICP / pixel</div>
+
+        <!-- USERBOX with CSS-only menu toggle -->
+        <div class="userbox">
+  <span class="muted" id="who">Not signed in</span>
+
+  <!-- CSS-only dropdown using details/summary -->
+  <details id="userMenuBox">
+    <summary class="pill" id="btn-login" aria-haspopup="menu" aria-controls="userMenu">
+      Sign in
+    </summary>
+    <div class="menu" id="userMenu" role="menu">
+      <button type="button" class="menu-item" id="menu-copy" onclick="window.__hardCopy && window.__hardCopy()">Copy address</button>
+      <button type="button" class="menu-item" id="menu-signout" onclick="window.__hardSignOut && window.__hardSignOut()">Sign out</button>
+    </div>
+  </details>
+</div>
+
+      </div>
+    </header>
+
+    <main>
+      <section class="card">
+        <div class="toolbar" style="margin-bottom:12px;">
+          <button class="pill" id="btn-claim-link">Claim + Set Link</button>
+          <button class="pill" id="btn-upload-trigger" type="button">Upload Image</button>
+          <input id="btn-upload" type="file" accept="image/*" style="display:none" />
+          <button class="pill" id="btn-paint">Freeform Paint</button>
+          <span class="muted" id="selectedCount">0 selected</span>
+        </div>
+
+        <!-- balance / address / affordability -->
+        <div class="statusbar" aria-live="polite">
+          <div class="muted" id="balance" title="Your ICP wallet balance">Balance: — ICP</div>
+          <div class="muted">Address: <span class="addr" id="walletAddr">—</span><span class="copy" id="copyAddr" title="Copy to clipboard">Copy</span></div>
+          <div id="affordMsg">You do not have enough ICP to buy this many pixels.</div>
+        </div>
+
+        <!-- PREVIEW BAR -->
+        <div id="previewBar" class="previewbar" aria-live="polite">
+          <span class="preview-meta" id="previewMeta">Preview ready — not yet paid.</span>
+          <span style="flex:1"></span>
+          <button class="pill primary" id="btn-apply-pay">Apply &amp; Pay</button>
+          <button class="pill ghost" id="btn-preview-cancel">Discard Preview</button>
+        </div>
+
+        <!-- billboard -->
+        <div class="canvas-scroll">
+          <div id="root"></div>
+        </div>
+
+        <div class="spacer"></div>
+        <p class="hint">Tip: click and drag to select a rectangle. You can upload an image to map into your selection, or paint freehand in a mini editor.</p>
+      </section>
+
+      <section class="card">
+        <h2 style="margin:0 0 8px 0; font-size:1.1rem;">How to use</h2>
+        <ol class="list">
+          <li><strong>Sign in</strong> (Internet Identity). Your <strong>ICP balance</strong> appears above the billboard.</li>
+          <li>Send <strong>ICP tokens</strong> to your newly created wallet address (displayed).</li>
+          <li><strong>Drag-select</strong> a rectangular region on the canvas — the size (WxH and total pixels) shows as you drag.</li>
+          <li>Click <strong>Upload Image</strong> to map an image into your selection, or <strong>Freeform Paint</strong> to draw pixel-by-pixel.</li>
+          <li>Click <strong>Claim + Set Link</strong> to purchase those pixels at <strong>0.01 ICP per pixel</strong>.</li>
+          <li>After claiming, your edits are applied and become visible to everyone.</li>
+        </ol>
+      </section>
+    </main>
+
+    <footer>
+      <p>© <span id="year"></span> One Million Pixel Billboard • Built on the Internet Computer</p>
+    </footer>
+
+    <script>
+      document.getElementById('year').textContent = new Date().getFullYear();
+
+      // ---------- HARD global actions (work even if other JS fails) ----------
+      window.__hardCopy = function(){
+        var addr = (document.getElementById('walletAddr')||{}).textContent || '';
+        var copyEl = document.getElementById('copyAddr');
+        if (!addr || addr === '—') return;
+        if (navigator.clipboard && navigator.clipboard.writeText){
+          navigator.clipboard.writeText(addr).then(function(){
+            if (copyEl){ copyEl.textContent='Copied!'; setTimeout(function(){ copyEl.textContent='Copy' }, 900); }
+          });
+        } else {
+          var ta=document.createElement('textarea'); ta.value=addr; document.body.appendChild(ta);
+          ta.select(); try{ document.execCommand('copy'); }catch(e){} document.body.removeChild(ta);
+          if (copyEl){ copyEl.textContent='Copied!'; setTimeout(function(){ copyEl.textContent='Copy' }, 900); }
+        }
+        var t=document.getElementById('userMenuToggle'); if (t) t.checked=false; // close after action
+      };
+
+      window.__hardSignOut = function(){
+        try { localStorage.removeItem('ic_principal'); } catch(e){}
+        var who=document.getElementById('who'); if (who) who.textContent='Not signed in';
+        var addrEl=document.getElementById('walletAddr'); if (addrEl) addrEl.textContent='—';
+        var btn=document.getElementById('btn-login'); if (btn){ btn.classList.remove('signed-in'); btn.textContent='Sign in'; }
+        var t=document.getElementById('userMenuToggle'); if (t) t.checked=false; // close menu
+        try { window.dispatchEvent(new CustomEvent('ic:signout')); } catch(e){}
+        setTimeout(function(){ location.reload(); }, 300); // last resort cleanup
+      };
+
+      // ---------- Normal UI wiring ----------
+      var whoEl = document.getElementById('who');
+      var btnLogin = document.getElementById('btn-login');
+      var toggle = document.getElementById('userMenuToggle');
+      var userMenu = document.getElementById('userMenu');
+      var copyPill = document.getElementById('copyAddr');
+      var uploadTrigger = document.getElementById('btn-upload-trigger');
+      var fileInput = document.getElementById('btn-upload');
+
+      // Clicking the pill: if not signed in, ask app to login and keep menu closed
+      btnLogin.addEventListener('click', function(e){
+        var saved = '';
+        try { saved = localStorage.getItem('ic_principal') || ''; } catch(err){}
+        var isSigned = !!saved || (whoEl && whoEl.textContent && whoEl.textContent !== 'Not signed in');
+        if (!isSigned){
+          if (toggle) toggle.checked = false;
+          try { window.dispatchEvent(new CustomEvent('ic:login')); } catch(err){}
+          // let CSS-only toggle open if you prefer; we force-close for clarity here
+          e.preventDefault();
+        }
+      });
+
+      // Click outside to close CSS-only menu
+      document.addEventListener('click', function(e){
+        if (!toggle) return;
+        var t = e.target;
+        if (t === btnLogin || (userMenu && userMenu.contains(t))) return;
+        toggle.checked = false;
+      });
+
+      // Toolbar copy (same hard function)
+      copyPill.addEventListener('click', function(){ window.__hardCopy(); });
+
+      // Upload trigger -> hidden input
+      uploadTrigger.addEventListener('click', function(){
+        var fi = document.getElementById('btn-upload'); if (fi && fi.click) fi.click();
+      });
+
+      // React app signals principal (use as address), update UI and pill
+      window.addEventListener('ic:principal', function(e){
+        var p=e && e.detail || '';
+        if (!p) return;
+        try{ localStorage.setItem('ic_principal', p); }catch(err){}
+        var addr=document.getElementById('walletAddr'); if (addr) addr.textContent=p;
+        if (whoEl) whoEl.textContent=p;
+        if (btnLogin){ btnLogin.classList.add('signed-in'); btnLogin.textContent='🟢 Signed in'; }
+      });
+
+      // Prefer a real deposit address if your app emits one
+      window.addEventListener('ic:wallet', function(e){
+        var a = e && e.detail && e.detail.address;
+        if (a){ var addr=document.getElementById('walletAddr'); if (addr) addr.textContent=a; }
+      });
+
+      // Preview bar passthrough (from App.tsx)
+      var previewBar = document.getElementById('previewBar');
+      var previewMeta = document.getElementById('previewMeta');
+      var btnApplyPay = document.getElementById('btn-apply-pay');
+      var btnCancel = document.getElementById('btn-preview-cancel');
+
+      window.addEventListener('ic:preview:on', function(e){
+        var d = e.detail || {};
+        var base = 'Preview '+d.w+'×'+d.h+' ('+d.pixels+' px) • Estimated cost '+(d.costICP || '—')+' ICP';
+        var extra = (d.affordable === false && d.neededICP) ? (' • Need '+d.neededICP+' ICP') : '';
+        previewMeta.textContent = base + extra;
+        previewBar.classList.add('show');
+        if (typeof d.affordable !== 'undefined' && btnApplyPay) {
+          btnApplyPay.disabled = d.affordable === false;
+          btnApplyPay.title = d.affordable === false ? ('Need '+d.neededICP+' ICP') : '';
+        }
+      });
+      window.addEventListener('ic:preview:off', function(){
+        previewBar.classList.remove('show');
+        if (btnApplyPay) { btnApplyPay.disabled = false; btnApplyPay.title = ''; }
+      });
+      btnApplyPay.addEventListener('click', function(){ window.dispatchEvent(new CustomEvent('ic:preview:apply')); });
+      btnCancel.addEventListener('click', function(){ window.dispatchEvent(new CustomEvent('ic:preview:cancel')); });
+
+// If not signed in, clicking the summary starts login instead of opening the menu
+(function () {
+  var who = document.getElementById('who');
+  var sum = document.getElementById('btn-login');
+  var box = document.getElementById('userMenuBox');
+  if (!sum || !box) return;
+  sum.addEventListener('click', function (e) {
+    var saved = '';
+    try { saved = localStorage.getItem('ic_principal') || ''; } catch (err) {}
+    var isSigned = !!saved || (who && who.textContent && who.textContent !== 'Not signed in');
+    if (!isSigned) {
+      e.preventDefault(); // don’t open dropdown
+      try { window.dispatchEvent(new CustomEvent('ic:login')); } catch (_) {}
+    }
+  });
+})();
+
+
+      // Restore signed-in state on reload
+      (function(){
+        var saved='';
+        try{ saved=localStorage.getItem('ic_principal')||''; }catch(e){}
+        if (saved){
+          var addr=document.getElementById('walletAddr'); if (addr) addr.textContent=saved;
+          if (whoEl) whoEl.textContent=saved;
+          if (btnLogin){ btnLogin.classList.add('signed-in'); btnLogin.textContent='🟢 Signed in'; }
+        }
+      })();
+    </script>
+
+    <!-- Vite entry (cache-busted to avoid stale asset) -->
+  </body>
+</html>
+
+
+
+
+
+
+
+
