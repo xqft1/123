@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 5173"
+    "dev": "vite --root frontend",
+    "build": "vite build --root frontend --outDir dist",
+    "preview": "vite preview --port 5173 --root dist"
   },
   "dependencies": {
     "@dfinity/agent": "^2.0.0",

@@ -1,7 +1,22 @@
 {
   "canisters": {
-    "billboard": { "type": "motoko", "main": "src/billboard/main.mo", "candid": "src/billboard/billboard.did" },
-    "www": { "type": "assets", "source": ["frontend/dist"] }
+    "billboard": {
+      "main": "src/billboard/main.mo",
+      "type": "motoko"
+    },
+    "www": {
+      "type": "assets",
+      "source": ["frontend/dist"]
+    }
   },
-  "networks": { "ic": { "providers": ["https://ic0.app"] } }
+  "networks": {
+    "ic": {
+      "providers": ["https://icp-api.io"],
+      "type": "persistent"
+    },
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  }
 }

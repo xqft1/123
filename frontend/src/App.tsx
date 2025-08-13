@@ -148,6 +148,7 @@ export default function App() {
   }
   const ledgerRef = useRef<any>(null)
   const principalRef = useRef<Principal | null>(null)
+  
   /** Keep identity to rebuild agents if needed */
   const identityRef = useRef<any>(null)
   const agentHostRef = useRef<string | null>(null)
@@ -174,76 +175,91 @@ export default function App() {
   const billboardId = import.meta.env.VITE_BILLBOARD_CANISTER_ID as string
   if (!billboardId) console.error('VITE_BILLBOARD_CANISTER_ID is missing')
 
-  useEffect(() => {
-    ;(async () => {
-      ensureStaticUI()
-      ensureCanvases()
-      ensurePurchaseUI()
+useEffect(() => {
+  (async () => {
+    ensureStaticUI();
+    ensureCanvases();
+    ensurePurchaseUI();
 
-      // Anonymous draw (fast) with host probe
-      try {
-        const { agent } = await connectBestHost()
-        const anonActor = Actor.createActor(billboardIDL as any, { agent, canisterId: billboardId })
-        try { await drawSingleShot(anonActor) } catch { await drawTilesParallel(anonActor) }
-      } catch (e) {
-        console.warn('Anonymous draw failed:', e)
-      }
-
-      // Restore selection
-      const restored = loadSelection()
-      if (restored) { setSelection(restored); drawSelectionMarquee(restored) }
-
-      wireSelectionHandlers()
-      wireButtons()
-
-      // Purchase bar hooks
-      if (payBtnRef.current && !(payBtnRef.current as any).__wired) {
-        (payBtnRef.current as any).__wired = true
-        payBtnRef.current.addEventListener('click', () => {
-          if (pendingPayRef.current) return
-          applyPay()
-        })
-      }
-      cancelBtnRef.current?.addEventListener('click', () => {
-        clearPreview(); pendingPreviewRef.current = null; dispatchPreviewOff()
-        updatePurchaseUI(selectionRef.current, false)
-      })
-
-      // Auth
-      const auth = await AuthClient.create()
-      if (await auth.isAuthenticated()) await finishLogin(auth)
-      else updateSigninUI(false)
-    })()
-
-    // Global login/signout hooks
-    const onLogin = () => { login() }
-    const onSignout = async () => {
-      const auth = await AuthClient.create()
-      await auth.logout()
-      billboardRef.current = null
-      ledgerRef.current = null
-      principalRef.current = null
-      agentHostRef.current = null
-      balanceE8sRef.current = 0n
-      if (balanceTimer.current) { clearInterval(balanceTimer.current); balanceTimer.current = null }
-      updateSigninUI(false)
-      updateAddressUI()
-      setBalanceText('—') // clear
-      clearPreview()
-      pendingPreviewRef.current = null
-      dispatchPreviewOff()
-      updatePurchaseUI(selectionRef.current, false)
-      toast('Signed out', 'info')
+    // Anonymous draw (fast) with host probe
+    try {
+      const { agent } = await connectBestHost();
+      const anonActor = Actor.createActor(billboardIDL as any, { agent, canisterId: billboardId });
+      try { await drawSingleShot(anonActor); } catch { await drawTilesParallel(anonActor); }
+    } catch (e) {
+      console.warn('Anonymous draw failed:', e);
     }
-    window.addEventListener('ic:login', onLogin as EventListener)
-    window.addEventListener('ic:signout', onSignout as EventListener)
 
-    return () => {
-      window.removeEventListener('ic:login', onLogin as EventListener)
-      window.removeEventListener('ic:signout', onSignout as EventListener)
-      if (balanceTimer.current) { clearInterval(balanceTimer.current); balanceTimer.current = null }
+    // Restore selection
+    const restored = loadSelection();
+    if (restored) { setSelection(restored); drawSelectionMarquee(restored); }
+
+    wireSelectionHandlers();
+    wireButtons();
+
+    // Purchase bar hooks
+    if (payBtnRef.current && !(payBtnRef.current as any).__wired) {
+      (payBtnRef.current as any).__wired = true;
+      payBtnRef.current.addEventListener('click', () => {
+        if (pendingPayRef.current) return;
+        applyPay();
+      });
     }
-  }, [])
+    cancelBtnRef.current?.addEventListener('click', () => {
+      clearPreview(); pendingPreviewRef.current = null; dispatchPreviewOff();
+      updatePurchaseUI(selectionRef.current, false);
+    });
+
+    // Auth
+    const auth = await AuthClient.create();
+    if (await auth.isAuthenticated()) await finishLogin(auth);
+    else updateSigninUI(false);
+
+    // Add polling for real-time updates
+    const pollInterval = setInterval(async () => {
+      if (billboardRef.current) {
+        try {
+          await drawSingleShot(billboardRef.current);
+        } catch (e) {
+          console.warn('Poll draw failed:', e);
+          try {
+            await drawTilesParallel(billboardRef.current);
+          } catch {}
+        }
+      }
+    }, 30000); // Every 30 seconds
+  })();
+
+  // Global login/signout hooks
+  const onLogin = () => { login(); };
+  const onSignout = async () => {
+    const auth = await AuthClient.create();
+    await auth.logout();
+    billboardRef.current = null;
+    ledgerRef.current = null;
+    principalRef.current = null;
+    agentHostRef.current = null;
+    balanceE8sRef.current = 0n;
+    if (balanceTimer.current) { clearInterval(balanceTimer.current); balanceTimer.current = null; }
+    updateSigninUI(false);
+    updateAddressUI();
+    setBalanceText('—');
+    clearPreview();
+    pendingPreviewRef.current = null;
+    dispatchPreviewOff();
+    updatePurchaseUI(selectionRef.current, false);
+    toast('Signed out', 'info');
+  };
+  window.addEventListener('ic:login', onLogin as EventListener);
+  window.addEventListener('ic:signout', onSignout as EventListener);
+
+  return () => {
+    window.removeEventListener('ic:login', onLogin as EventListener);
+    window.removeEventListener('ic:signout', onSignout as EventListener);
+    if (balanceTimer.current) { clearInterval(balanceTimer.current); balanceTimer.current = null; }
+    clearInterval(pollInterval); // Cleanup polling
+  };
+}, []);
 
   // Wire public click-through once on mount
   useEffect(() => { try { wirePublicClickThru() } catch {} }, [])
@@ -485,6 +501,30 @@ async function connectBestHost(
     }
     ctx.putImageData(img, 0, 0)
   }
+  async function refreshWithLinks(startX = 0, startY = 0, width = 1000, height = 1000) {
+  if (!billboardRef.current) return;
+  try {
+    const pixels = await billboardRef.current.get_pixels(startX, startY, width, height);
+    const { ctx } = ensureCanvases();
+    const img = ctx.createImageData(width, height);
+    let i = 0;
+    for (let y = startY; y < startY + height; y++) {
+      for (let x = startX; x < startX + width; x++) {
+        const base = i * 4;
+        const pixel = pixels.find(p => p.x === x && p.y === y);
+        const rgba = pixel ? (pixel.color >>> 0) : 0xFFFFFFFF;
+        img.data[base + 0] = (rgba >>> 24) & 255;
+        img.data[base + 1] = (rgba >>> 16) & 255;
+        img.data[base + 2] = (rgba >>> 8) & 255;
+        img.data[base + 3] = (rgba >>> 0) & 255;
+        i++;
+      }
+    }
+    ctx.putImageData(img, startX, startY);
+  } catch (e) {
+    console.warn('refreshWithLinks failed:', e);
+  }
+}
   async function drawTilesParallel(a: any) {
     const { ctx } = ensureCanvases()
     const tiles: Array<{ x: number; y: number; w: number; h: number }> = []
@@ -538,34 +578,70 @@ async function connectBestHost(
 }
 
   function wirePublicClickThru() {
-    const { base } = ensureCanvases()
-    if ((base as any)._ombbClickWired) return
-    ;(base as any)._ombbClickWired = true
+  const { base } = ensureCanvases();
+  if ((base as any)._ombbClickWired) return;
+  (base as any)._ombbClickWired = true;
 
-    base.addEventListener('click', async (ev: MouseEvent) => {
-      if (selectionRef.current || pendingPreviewRef.current) return
+  base.addEventListener('click', async (ev: MouseEvent) => {
+    if (selectionRef.current || pendingPreviewRef.current) return;
 
-      let actor = billboardRef.current
-      if (!actor) {
-        try {
-          const { agent } = await connectBestHost()
-          actor = Actor.createActor(billboardIDL as any, { agent, canisterId: billboardId })
-        } catch {
-          return
-        }
+    let actor = billboardRef.current;
+    if (!actor) {
+      try {
+        const { agent } = await connectBestHost();
+        actor = Actor.createActor(billboardIDL as any, { agent, canisterId: billboardId });
+      } catch {
+        return;
       }
+    }
 
-      const r = base.getBoundingClientRect()
-      const sx = base.width / r.width
-      const sy = base.height / r.height
-      const x = Math.floor((ev.clientX - r.left) * sx)
-      const y = Math.floor((ev.clientY - r.top) * sy)
-      if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return
+    const r = base.getBoundingClientRect();
+    const sx = base.width / r.width;
+    const sy = base.height / r.height;
+    const x = Math.floor((ev.clientX - r.left) * sx);
+    const y = Math.floor((ev.clientY - r.top) * sy);
+    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return;
 
-      const link = await fetchLinkAt(actor, x, y)
-      if (link) window.open(link, '_blank', 'noopener')
-    })
-  }
+    const link = await fetchLinkAt(actor, x, y);
+    if (link) window.open(link, '_blank', 'noopener');
+  });
+
+  base.addEventListener('mousemove', async (ev: MouseEvent) => {
+    if (selectionRef.current || pendingPreviewRef.current) return;
+
+    let actor = billboardRef.current;
+    if (!actor) {
+      try {
+        const { agent } = await connectBestHost();
+        actor = Actor.createActor(billboardIDL as any, { agent, canisterId: billboardId });
+      } catch {
+        base.title = '';
+        base.style.cursor = 'crosshair';
+        return;
+      }
+    }
+
+    const r = base.getBoundingClientRect();
+    const sx = base.width / r.width;
+    const sy = base.height / r.height;
+    const x = Math.floor((ev.clientX - r.left) * sx);
+    const y = Math.floor((ev.clientY - r.top) * sy);
+    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) {
+      base.title = '';
+      base.style.cursor = 'crosshair';
+      return;
+    }
+
+    const link = await fetchLinkAt(actor, x, y);
+    if (link) {
+      base.title = link; // Show URL on hover
+      base.style.cursor = 'pointer';
+    } else {
+      base.title = '';
+      base.style.cursor = 'crosshair';
+    }
+  });
+}
 
 
 

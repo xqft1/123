@@ -1,30 +1,35 @@
-type Billboard = 
- service {
-   admin_set_ledger: (principal) -> ();
-   admin_set_price_per_pixel_e8s: (nat) -> ();
-   admin_set_recipient:
-    (record {
-       owner: principal;
-       subaccount: opt vec nat8;
-     }) -> ();
-   claim_pixels: (vec nat32, opt text) ->
-    (record {
-       claimed: nat32;
-       cost_paid_e8s: nat;
-     });
-   get_canvas_chunk: (nat32, nat32, nat32, nat32) -> (vec nat32) query;
-   ledger_canister: () -> (principal) query;
-   link_for_pixel: (nat32) -> (opt text) query;
-   paint: (vec record {
-                 color: nat32;
-                 index: nat32;
-               }) -> ();
-   price_per_pixel_e8s: () -> (nat) query;
-   recipient_account: () ->
-    (record {
-       owner: principal;
-       subaccount: opt vec nat8;
-     }) query;
-   set_link: (opt text) -> ();
+type PixelInfo = 
+ record {
+   color: nat32;
+   link: opt text;
+   x: nat;
+   y: nat;
  };
-service : () -> Billboard
+service : {
+  claim_region: (rect: record {
+                         x0: nat;
+                         x1: nat;
+                         y0: nat;
+                         y1: nat;
+                       }) -> ();
+  get_canvas_chunk: (startX: nat, startY: nat, width: nat, height: nat) ->
+   (vec nat32) query;
+  get_pixels: (startX: nat, startY: nat, width: nat, height: nat) ->
+   (vec PixelInfo) query;
+  link_at: (pos: record {
+                   x: nat;
+                   y: nat;
+                 }) -> (opt text) query;
+  paint_region: (rect: record {
+                         x0: nat;
+                         x1: nat;
+                         y0: nat;
+                         y1: nat;
+                       }, payload: vec nat32) -> ();
+  set_region_link: (rect: record {
+                            x0: nat;
+                            x1: nat;
+                            y0: nat;
+                            y1: nat;
+                          }, link: text) -> ();
+}

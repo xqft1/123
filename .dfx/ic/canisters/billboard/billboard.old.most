@@ -1,10 +1,4 @@
 // Version: 1.0.0
 actor {
-  stable var LEDGER_CANISTER : Principal;
-  stable var PRICE_PER_PIXEL_E8S : Nat;
-  stable var RECIPIENT : {owner : Principal; subaccount : ?[Nat8]};
-  stable var colors : [var Nat32];
-  stable var ownerIndex : [var Nat32];
-  stable var ownerLinksBackup : [(Principal, Text)];
-  stable var owners : [Principal]
+  stable var pixelEntries : [(Nat, {color : Nat32; link : ?Text})]
 };

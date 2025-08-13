@@ -1,47 +1,64 @@
 export const idlFactory = ({ IDL }) => {
-  const Billboard = IDL.Service({
-    'admin_set_ledger' : IDL.Func([IDL.Principal], [], []),
-    'admin_set_price_per_pixel_e8s' : IDL.Func([IDL.Nat], [], []),
-    'admin_set_recipient' : IDL.Func(
+  const PixelInfo = IDL.Record({
+    'x' : IDL.Nat,
+    'y' : IDL.Nat,
+    'link' : IDL.Opt(IDL.Text),
+    'color' : IDL.Nat32,
+  });
+  return IDL.Service({
+    'claim_region' : IDL.Func(
         [
           IDL.Record({
-            'owner' : IDL.Principal,
-            'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+            'x0' : IDL.Nat,
+            'x1' : IDL.Nat,
+            'y0' : IDL.Nat,
+            'y1' : IDL.Nat,
           }),
         ],
         [],
-        [],
-      ),
-    'claim_pixels' : IDL.Func(
-        [IDL.Vec(IDL.Nat32), IDL.Opt(IDL.Text)],
-        [IDL.Record({ 'cost_paid_e8s' : IDL.Nat, 'claimed' : IDL.Nat32 })],
         [],
       ),
     'get_canvas_chunk' : IDL.Func(
-        [IDL.Nat32, IDL.Nat32, IDL.Nat32, IDL.Nat32],
+        [IDL.Nat, IDL.Nat, IDL.Nat, IDL.Nat],
         [IDL.Vec(IDL.Nat32)],
         ['query'],
       ),
-    'ledger_canister' : IDL.Func([], [IDL.Principal], ['query']),
-    'link_for_pixel' : IDL.Func([IDL.Nat32], [IDL.Opt(IDL.Text)], ['query']),
-    'paint' : IDL.Func(
-        [IDL.Vec(IDL.Record({ 'color' : IDL.Nat32, 'index' : IDL.Nat32 }))],
-        [],
-        [],
-      ),
-    'price_per_pixel_e8s' : IDL.Func([], [IDL.Nat], ['query']),
-    'recipient_account' : IDL.Func(
-        [],
-        [
-          IDL.Record({
-            'owner' : IDL.Principal,
-            'subaccount' : IDL.Opt(IDL.Vec(IDL.Nat8)),
-          }),
-        ],
+    'get_pixels' : IDL.Func(
+        [IDL.Nat, IDL.Nat, IDL.Nat, IDL.Nat],
+        [IDL.Vec(PixelInfo)],
         ['query'],
       ),
-    'set_link' : IDL.Func([IDL.Opt(IDL.Text)], [], []),
+    'link_at' : IDL.Func(
+        [IDL.Record({ 'x' : IDL.Nat, 'y' : IDL.Nat })],
+        [IDL.Opt(IDL.Text)],
+        ['query'],
+      ),
+    'paint_region' : IDL.Func(
+        [
+          IDL.Record({
+            'x0' : IDL.Nat,
+            'x1' : IDL.Nat,
+            'y0' : IDL.Nat,
+            'y1' : IDL.Nat,
+          }),
+          IDL.Vec(IDL.Nat32),
+        ],
+        [],
+        [],
+      ),
+    'set_region_link' : IDL.Func(
+        [
+          IDL.Record({
+            'x0' : IDL.Nat,
+            'x1' : IDL.Nat,
+            'y0' : IDL.Nat,
+            'y1' : IDL.Nat,
+          }),
+          IDL.Text,
+        ],
+        [],
+        [],
+      ),
   });
-  return Billboard;
 };
 export const init = ({ IDL }) => { return []; };
